@@ -2,37 +2,39 @@ package com.jianhwa.parkingmanagement.controller;
 
 import com.jianhwa.parkingmanagement.entity.Car;
 import com.jianhwa.parkingmanagement.entity.ParkingTicket;
-import org.springframework.stereotype.Controller;
+import com.jianhwa.parkingmanagement.repository.CarRepository;
+import com.jianhwa.parkingmanagement.repository.ParkingTicketRepository;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
 
-@Controller    // This means that this class is a Controller
-@RequestMapping(path="/car")
+@RestController    // This means that this class is a Controller
+@RequestMapping(path="/cars")
 public class CarController {
+    private CarRepository carRepository;
+    private ParkingTicketRepository parkingTicketRepository;
 
     @GetMapping(path = "{user}/getCarList")
     public List<Car> getCarList(@PathVariable("user") String userId){
-        List<Car> carList = new ArrayList<Car>();
-//        database get cars of user
+        List<Car> carList = carRepository.findAllByUserId(userId);  //database get cars of user
         return carList;
     }
 
     @GetMapping(path = "{car_plate}/checkCarLog")
     public List<ParkingTicket> getCarLogList (@PathVariable("car_plate") String car_plate){
-        List<ParkingTicket> carLogList = new ArrayList<ParkingTicket>();
-//        database get car logs
+        List<ParkingTicket> carLogList = parkingTicketRepository.findAllByCarPlateNum(car_plate);  //database get car logs
         return carLogList;
     }
 
-    @DeleteMapping(path = "{car_plate}")
-    public void deleteCar (@PathVariable("car_plate") String car_plate){
-//        delete car from database
+    @PostMapping(path = "deleteCar")
+    public String deleteCar (String car_plate){
+        carRepository.deleteById(car_plate);  //delete car from database
+        return "Success";
     }
 
     @PostMapping(path = "addCar")
-    public void addCar (Car newCar){
-//        add car from database
+    public String addCar (Car newCar){
+        carRepository.save(newCar);  //add car from database
+        return "Success";
     }
 }

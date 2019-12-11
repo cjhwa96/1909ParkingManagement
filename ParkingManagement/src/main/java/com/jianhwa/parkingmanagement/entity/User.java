@@ -1,7 +1,5 @@
 package com.jianhwa.parkingmanagement.entity;
 
-import net.bytebuddy.implementation.bind.MethodDelegationBinder;
-
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
@@ -10,6 +8,7 @@ import javax.persistence.Id;
 public class User {
 
     @Id
+    @Column(unique = true)
     private String id;
     @Column(unique = true)
     private String email;

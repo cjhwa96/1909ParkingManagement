@@ -1,16 +1,17 @@
 package com.jianhwa.parkingmanagement.controller;
 
-import com.jianhwa.parkingmanagement.entity.ParkingTicket;
 import com.jianhwa.parkingmanagement.entity.ParkingSpace;
-import org.springframework.stereotype.Controller;
+import com.jianhwa.parkingmanagement.entity.ParkingTicket;
+import com.jianhwa.parkingmanagement.repository.ParkingTicketRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
 import java.util.Queue;
 
-@Controller    // This means that this class is a Controller
+@RestController    // This means that this class is a Controller
 @RequestMapping(path="/parking") // This means URL's start with /login (after Application path)
 public class ParkingManagement {
     private static final int BOOKING_LIMIT = 5;
@@ -22,8 +23,10 @@ public class ParkingManagement {
                                                        "D1", "D2", "D3", "D4", "D5"};
 
     private static int index, driveInCounter, bookingCounter;
-    private static HashMap<String, ParkingTicket> carTickets;
+    private static HashMap<String, ParkingTicket> parkingTicketList;
     private static Queue<ParkingTicket> drive_in_queue;
+
+    private ParkingTicketRepository parkingTicketRepository;
 
 
     public ParkingManagement() {
@@ -38,14 +41,17 @@ public class ParkingManagement {
 
     @GetMapping(path = "{user}/driveIn")
     public ParkingTicket driveIn(@PathVariable("user") String userId, String car_plate){
-        if (carTickets.get(car_plate) == null){
-            if ( checkSpaceAvailability()){
-                return checkIn(userId, car_plate);
+        if (parkingTicketList.get(car_plate) == null){
+            ParkingTicket newArrival = new ParkingTicket(userId, car_plate);
+            if ( checkSpaceAvailability() ){
+//                open Entrance Gate
+                return checkIn(newArrival);
             } else {
-                return queueUp(userId, car_plate);
+                drive_in_queue.add(newArrival);
+                return newArrival;
             }
         } else {
-            return carTickets.get(car_plate);
+            return parkingTicketList.get(car_plate);
         }
     }
 
@@ -70,26 +76,30 @@ public class ParkingManagement {
         }
     }
 
-    private ParkingTicket checkIn(String userId, String car_plate){
-        ParkingTicket newArrival = new ParkingTicket(userId, car_plate);
-        newArrival.booking();
-        newArrival.arrived(parkingSpaceManager[index].getPs_num());
-        parkingSpaceManager[index].arrived(car_plate, newArrival.getId());
+    private ParkingTicket checkIn(ParkingTicket parkingTicket){
+        parkingTicket.booking();
+        parkingTicket.arrived(parkingSpaceManager[index].getPs_num());
+        parkingSpaceManager[index].arrived(parkingTicket.getCarPlateNum(), parkingTicket.getId());
         index++;
-        carTickets.put(car_plate,newArrival);
-        return newArrival;
+        parkingTicketList.put(parkingTicket.getCarPlateNum(),parkingTicket);
+        return parkingTicket;
     }
 
-    private ParkingTicket queueUp(String userId, String car_plate){
-        ParkingTicket newArrival = new ParkingTicket(userId, car_plate);
-        drive_in_queue.add(newArrival);
-        return newArrival;
+    private void checkQueue(){
+        if (!drive_in_queue.isEmpty()){
+            ParkingTicket parkingTicket = checkIn(drive_in_queue.poll());
+
+//            push notification
+
+
+//            open Entrance Gate
+        }
     }
 
     @GetMapping(path = "{car_plate}/checkOut")
     public ParkingTicket checkOut( @PathVariable("car_plate") String car_plate){
-        if (carTickets.get(car_plate) != null) {
-            ParkingTicket parkingTicket = carTickets.get(car_plate);
+        if (parkingTicketList.get(car_plate) != null) {
+            ParkingTicket parkingTicket = parkingTicketList.get(car_plate);
             parkingTicket.departed();
             for (int i = 0; i < index; i++) {
                 if (parking_space_num[i].equals(parkingTicket.getParkingSpace())){
@@ -97,8 +107,10 @@ public class ParkingManagement {
                     break;
                 }
             }
-            carTickets.remove(car_plate);
-//            insert parkingTicket to database
+            parkingTicketList.remove(car_plate);
+            parkingTicketRepository.save(parkingTicket);
+            checkQueue();
+//            open Exit Gate
             return parkingTicket;
         } else {
             return null;
@@ -107,42 +119,57 @@ public class ParkingManagement {
 
     @GetMapping(path = "{user}/booking")
     public ParkingTicket booking (@PathVariable("user") String userId, String car_plate){
-        if (carTickets.get(car_plate) == null) {
+        if (parkingTicketList.get(car_plate) == null) {
             if (bookingCounter <= BOOKING_LIMIT && checkSpaceAvailability()){
                 bookingCounter++;
                 ParkingTicket newTicket = new ParkingTicket(userId, car_plate);
                 newTicket.booking();
-                carTickets.put(car_plate, newTicket);
-                return carTickets.get(car_plate);
+                parkingTicketList.put(car_plate, newTicket);
+                return parkingTicketList.get(car_plate);
             }
         }
         return null;
     }
 
-    @GetMapping(path = "{user}/expressIn")
-    public ParkingTicket expressIn (@PathVariable("user") String userId, String car_plate){
-        if (carTickets.get(car_plate) != null && checkSpaceAvailability()){
-            sortingIndex();
-            ParkingTicket newArrival = carTickets.get(car_plate);
-            carTickets.remove(car_plate);
+    @GetMapping(path = "{car_plate}/expressIn")
+    public ParkingTicket expressIn (@PathVariable("car_plate") String car_plate){
+        if (parkingTicketList.get(car_plate) != null && checkSpaceAvailability()){
+            ParkingTicket newArrival = parkingTicketList.get(car_plate);
+            parkingTicketList.remove(car_plate);
             newArrival.arrived(parkingSpaceManager[index].getPs_num());
             parkingSpaceManager[index].arrived(car_plate, newArrival.getId());
             index++;
             bookingCounter--;
-            carTickets.put(car_plate,newArrival);
-            return carTickets.get(car_plate);
+            parkingTicketList.put(car_plate,newArrival);
+            return parkingTicketList.get(car_plate);
         }else {
             return null;
         }
     }
 
-    @GetMapping(path = "{car_plate}/checkCar")
+    @GetMapping(path = "{car_plate}/checkCarInParking")
     public ParkingTicket checkCar (@PathVariable("car_plate") String car_plate){
-        if (carTickets.get(car_plate) != null){
-            return carTickets.get(car_plate);
+        if (parkingTicketList.get(car_plate) != null){
+            return parkingTicketList.get(car_plate);
         }else {
             return null;
         }
     }
+
+    @GetMapping(path = "{car_plate}/cancelBooking")
+    public ParkingTicket cancelBooking (@PathVariable("car_plate") String car_plate){
+        if (parkingTicketList.get(car_plate) != null){
+            ParkingTicket ticketToCancel = parkingTicketList.get(car_plate);
+            parkingTicketList.remove(car_plate);
+            bookingCounter--;
+            ticketToCancel.departed();
+            parkingTicketRepository.save(ticketToCancel);
+            checkQueue();
+            return parkingTicketList.get(car_plate);
+        }else {
+            return null;
+        }
+    }
+
 
 }

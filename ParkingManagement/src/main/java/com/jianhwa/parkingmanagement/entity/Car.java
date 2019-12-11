@@ -10,7 +10,6 @@ public class Car {
     private String userId;
     private String carModel;
     private String carColor;
-    private boolean isParked;
 
     public Car() {
     }
@@ -20,7 +19,6 @@ public class Car {
         this.userId = userId;
         this.carModel = carModel;
         this.carColor = carColor;
-        this.isParked = false;
     }
 
     public String getCarPlate() {
@@ -53,13 +51,5 @@ public class Car {
 
     public void setCarColor(String carColor) {
         this.carColor = carColor;
-    }
-
-    public boolean isParked() {
-        return isParked;
-    }
-
-    public void setParked(boolean parked) {
-        isParked = parked;
     }
 }
